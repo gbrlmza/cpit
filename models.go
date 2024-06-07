@@ -35,3 +35,7 @@ type PaginatedResp[T any] struct {
 		Total int `json:"total"`
 	} `json:"meta"`
 }
+
+type UpsertData struct {
+	Data interface{} `json:"data"`
+}

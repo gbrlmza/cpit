@@ -504,6 +504,7 @@ func (r *cockpitReq) doHttp(ctx context.Context) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("api-key", r.apiKey)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpClient.Do(req)
 
@@ -540,9 +541,10 @@ func getBodyReader(body interface{}) (io.Reader, error) {
 	case string:
 		r = strings.NewReader(b)
 	default:
-		// try to encode it as json
+		// try to encode it as json, wrap it in the UpsertData struct
+		data := UpsertData{Data: body}
 		buf := &bytes.Buffer{}
-		if err := json.NewEncoder(buf).Encode(body); err != nil {
+		if err := json.NewEncoder(buf).Encode(data); err != nil {
 			return nil, fmt.Errorf("failed to encode body: %w", err)
 		}
 		r = buf
