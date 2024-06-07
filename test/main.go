@@ -19,12 +19,12 @@ func main() {
 	cpit.SetDefaultDebugMode(true)
 
 	data := map[string]interface{}{
-		"id":     "81b0d1d3666134637a00037c",
-		"title":  "mytitle",
+		"_id":    "906668493839374024000373",
+		"title":  "UPDATED Title",
 		"number": time.Now().Unix(),
 	}
 
-	err := cpit.UpsertItem(ctx, "test", cpit.WithBody(data))
+	err := cpit.UpsertItem(ctx, "test", cpit.WithData(data))
 	if err != nil {
 		log.Fatal(err)
 	}

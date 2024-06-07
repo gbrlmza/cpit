@@ -36,6 +36,7 @@ type PaginatedResp[T any] struct {
 	} `json:"meta"`
 }
 
-type UpsertData struct {
+// Data is a wrapper struct for fields in the upsert action
+type Data struct {
 	Data interface{} `json:"data"`
 }

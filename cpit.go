@@ -178,6 +178,7 @@ func GetItem(ctx context.Context, model string, id string, opts ...optionFn) err
 
 // UpsertItem upserts an item.
 // - model is the name of the model
+// When updating an item, the data/body must contain a valid _id field.
 func UpsertItem(ctx context.Context, model string, opts ...optionFn) error {
 	r := newCockpitReq()
 	r.method = http.MethodPost
@@ -274,9 +275,19 @@ func WithOutput(o interface{}) optionFn {
 
 // WithBody sets the body for the request.
 // The body can be an io.Reader, []byte, string or any other type that can be encoded as json.
+// The body should have the same structure as the model being upserted wrapped in the Data struct.
 func WithBody(b interface{}) optionFn {
 	return func(r *cockpitReq) error {
 		r.body = b
+		return nil
+	}
+}
+
+// WithData sets the data for the request, works in the same way as WithBody but wraps it in the Data struct.
+// The data will be encoded as json, so it must be a json marshable type.
+func WithData(data interface{}) optionFn {
+	return func(r *cockpitReq) error {
+		r.body = Data{Data: data}
 		return nil
 	}
 }
@@ -541,10 +552,9 @@ func getBodyReader(body interface{}) (io.Reader, error) {
 	case string:
 		r = strings.NewReader(b)
 	default:
-		// try to encode it as json, wrap it in the UpsertData struct
-		data := UpsertData{Data: body}
+		// try to encode it as json
 		buf := &bytes.Buffer{}
-		if err := json.NewEncoder(buf).Encode(data); err != nil {
+		if err := json.NewEncoder(buf).Encode(body); err != nil {
 			return nil, fmt.Errorf("failed to encode body: %w", err)
 		}
 		r = buf
