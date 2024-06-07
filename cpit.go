@@ -263,6 +263,7 @@ func WithOutputHeader(h *http.Header) optionFn {
 }
 
 // WithOutput sets where the output should be written to.
+// The response body will be decoded as json into the output.
 func WithOutput(o interface{}) optionFn {
 	return func(r *cockpitReq) error {
 		if o == nil || reflect.TypeOf(o).Kind() != reflect.Ptr {
