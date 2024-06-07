@@ -75,35 +75,35 @@ var (
 	mtx = &sync.RWMutex{}
 )
 
-// SetDefaultHttpClient sets the default http client used for requests
+// SetDefaultHttpClient sets the default http client used for requests.
 func SetDefaultHttpClient(c *http.Client) {
 	mtx.Lock()
+	defer mtx.Unlock()
 	defaultHttpClient = c
-	mtx.Unlock()
 }
 
-// SetDefaultBaseUrl sets the default base url used for requests
+// SetDefaultBaseUrl sets the default base url used for requests.
 func SetDefaultBaseUrl(url string) {
 	mtx.Lock()
+	defer mtx.Unlock()
 	defaultBaseUrl = url
-	mtx.Unlock()
 }
 
-// SetDefaultApiKey sets the default api key used for requests
+// SetDefaultApiKey sets the default api key used for requests.
 func SetDefaultApiKey(key string) {
 	mtx.Lock()
+	defer mtx.Unlock()
 	defaultApiKey = key
-	mtx.Unlock()
 }
 
-// SetDefaultDebugMode sets the default debug mode used for requests
+// SetDefaultDebugMode sets the default debug mode used for requests.
 func SetDefaultDebugMode(enabled bool) {
 	mtx.Lock()
+	defer mtx.Unlock()
 	defaultDebugMode = enabled
-	mtx.Unlock()
 }
 
-// newCockpitReq returns a new cockpitReq with the default values
+// newCockpitReq returns a new cockpitReq with the default values.
 func newCockpitReq() cockpitReq {
 	mtx.RLock()
 	defer mtx.RUnlock()
@@ -116,7 +116,7 @@ func newCockpitReq() cockpitReq {
 	}
 }
 
-// GetItems requests items of a model
+// GetItems requests items of a model.
 // - model is the name of the model
 func GetItems(ctx context.Context, model string, opts ...optionFn) error {
 	r := newCockpitReq()
@@ -128,7 +128,7 @@ func GetItems(ctx context.Context, model string, opts ...optionFn) error {
 	return r.run(ctx)
 }
 
-// GetSingleton requests a singleton model
+// GetSingleton requests a singleton model.
 // - model is the name of the model
 func GetSingleton(ctx context.Context, model string, opts ...optionFn) error {
 	r := newCockpitReq()
@@ -140,7 +140,7 @@ func GetSingleton(ctx context.Context, model string, opts ...optionFn) error {
 	return r.run(ctx)
 }
 
-// GetAsset requests an asset
+// GetAsset requests an asset.
 // - id is the id of the asset
 func GetAsset(ctx context.Context, id string, opts ...optionFn) error {
 	r := newCockpitReq()
@@ -152,7 +152,7 @@ func GetAsset(ctx context.Context, id string, opts ...optionFn) error {
 	return r.run(ctx)
 }
 
-// GetImage requests an image
+// GetImage requests an image.
 // - id is the id of the image
 func GetImage(ctx context.Context, id string, opts ...optionFn) (string, error) {
 	r := newCockpitReq()
@@ -165,7 +165,7 @@ func GetImage(ctx context.Context, id string, opts ...optionFn) (string, error) 
 	return r.runImage(ctx)
 }
 
-// GetItem requests an item
+// GetItem requests an item.
 // - model is the name of the model
 // - id is the id of the item
 func GetItem(ctx context.Context, model string, id string, opts ...optionFn) error {
@@ -178,7 +178,7 @@ func GetItem(ctx context.Context, model string, id string, opts ...optionFn) err
 	return r.run(ctx)
 }
 
-// UpsertItem upserts an item
+// UpsertItem upserts an item.
 // - model is the name of the model
 func UpsertItem(ctx context.Context, model string, opts ...optionFn) error {
 	r := newCockpitReq()
@@ -190,7 +190,7 @@ func UpsertItem(ctx context.Context, model string, opts ...optionFn) error {
 	return r.run(ctx)
 }
 
-// DeleteItem deletes an item
+// DeleteItem deletes an item.
 // - model is the name of the model
 // - id is the id of the item
 func DeleteItem(ctx context.Context, model string, id string, opts ...optionFn) error {
@@ -203,7 +203,7 @@ func DeleteItem(ctx context.Context, model string, id string, opts ...optionFn) 
 	return r.run(ctx)
 }
 
-// applyOptions applies the options to the request and executes it
+// applyOptions applies the options to the request and executes it.
 func applyOptions(r *cockpitReq, opts []optionFn) error {
 	for _, o := range opts {
 		if err := o(r); err != nil {
@@ -214,7 +214,7 @@ func applyOptions(r *cockpitReq, opts []optionFn) error {
 	return nil
 }
 
-// WithHttpClient sets the http client for the request
+// WithHttpClient sets the http client for the request.
 func WithHttpClient(c *http.Client) optionFn {
 	return func(r *cockpitReq) error {
 		r.httpClient = c
@@ -222,7 +222,7 @@ func WithHttpClient(c *http.Client) optionFn {
 	}
 }
 
-// WithBaseURL sets the base url for the request
+// WithBaseURL sets the base url for the request.
 func WithBaseURL(url string) optionFn {
 	return func(r *cockpitReq) error {
 		if url == "" {
@@ -234,7 +234,7 @@ func WithBaseURL(url string) optionFn {
 	}
 }
 
-// WithApiKey sets the api key for the request
+// WithApiKey sets the api key for the request.
 func WithApiKey(key string) optionFn {
 	return func(r *cockpitReq) error {
 		if key == "" {
@@ -246,7 +246,7 @@ func WithApiKey(key string) optionFn {
 	}
 }
 
-// WithDebugMode sets the debug mode for the request
+// WithDebugMode sets the debug mode for the request.
 func WithDebugMode(enabled bool) optionFn {
 	return func(r *cockpitReq) error {
 		r.debug = enabled
@@ -254,7 +254,7 @@ func WithDebugMode(enabled bool) optionFn {
 	}
 }
 
-// WithOutputHeader sets where the response headers should be written to
+// WithOutputHeader sets where the response headers should be written to.
 func WithOutputHeader(h *http.Header) optionFn {
 	return func(r *cockpitReq) error {
 		r.outputHeader = h
@@ -262,7 +262,7 @@ func WithOutputHeader(h *http.Header) optionFn {
 	}
 }
 
-// WithBody sets where the output should be written to
+// WithOutput sets where the output should be written to.
 func WithOutput(o interface{}) optionFn {
 	return func(r *cockpitReq) error {
 		if o == nil || reflect.TypeOf(o).Kind() != reflect.Ptr {
@@ -273,7 +273,16 @@ func WithOutput(o interface{}) optionFn {
 	}
 }
 
-// WithResizeMode sets the resize mode for the image
+// WithBody sets the body for the request.
+// The body can be an io.Reader, []byte, string or any other type that can be encoded as json.
+func WithBody(b interface{}) optionFn {
+	return func(r *cockpitReq) error {
+		r.body = b
+		return nil
+	}
+}
+
+// WithResizeMode sets the resize mode for the image.
 func WithResizeMode(m string) optionFn {
 	return func(r *cockpitReq) error {
 		if m != ResizeModeThumbnail &&
@@ -288,7 +297,7 @@ func WithResizeMode(m string) optionFn {
 	}
 }
 
-// WithWidth sets the width for the image
+// WithWidth sets the width for the image.
 func WithWidth(w int) optionFn {
 	return func(r *cockpitReq) error {
 		if w < 1 {
@@ -299,7 +308,7 @@ func WithWidth(w int) optionFn {
 	}
 }
 
-// WithHeight sets the height for the image
+// WithHeight sets the height for the image.
 func WithHeight(h int) optionFn {
 	return func(r *cockpitReq) error {
 		if h < 1 {
@@ -310,7 +319,7 @@ func WithHeight(h int) optionFn {
 	}
 }
 
-// WithQuality sets the quality for the image
+// WithQuality sets the quality for the image.
 func WithQuality(q int) optionFn {
 	return func(r *cockpitReq) error {
 		if q < 1 || q > 100 {
@@ -321,7 +330,7 @@ func WithQuality(q int) optionFn {
 	}
 }
 
-// WithMime sets the mime type for the image
+// WithMime sets the mime type for the image.
 func WithMime(mime string) optionFn {
 	return func(r *cockpitReq) error {
 		if mime != MimeTypeAuto &&
@@ -338,7 +347,7 @@ func WithMime(mime string) optionFn {
 	}
 }
 
-// WithLocale specifies the wanted locale
+// WithLocale specifies the wanted locale.
 func WithLocale(locale string) optionFn {
 	return func(r *cockpitReq) error {
 		r.params.Set("locale", locale)
@@ -382,7 +391,7 @@ func WithSort(sort string) optionFn {
 	}
 }
 
-// WithLimit specifies the number of items to return
+// WithLimit specifies the number of items to return.
 func WithLimit(limit int) optionFn {
 	return func(r *cockpitReq) error {
 		if limit < 1 {
@@ -407,7 +416,7 @@ func WithSkip(skip int) optionFn {
 	}
 }
 
-// WithPopulate specifies if linked content items should be populated
+// WithPopulate specifies if linked content items should be populated.
 func WithPopulate(enabled bool) optionFn {
 	return func(r *cockpitReq) error {
 		v := "0"
@@ -420,7 +429,7 @@ func WithPopulate(enabled bool) optionFn {
 	}
 }
 
-// run executes the request and parses the response
+// run executes the request and parses the response.
 func (r *cockpitReq) run(ctx context.Context) error {
 	resp, err := r.doHttp(ctx)
 	if err != nil {
@@ -447,7 +456,7 @@ func (r *cockpitReq) run(ctx context.Context) error {
 	return nil
 }
 
-// run executes the request and parses the response as an image url
+// run executes the request and parses the response as an image url.
 func (r *cockpitReq) runImage(ctx context.Context) (string, error) {
 	resp, err := r.doHttp(ctx)
 	if err != nil {
@@ -467,7 +476,7 @@ func (r *cockpitReq) runImage(ctx context.Context) (string, error) {
 	return string(body), nil
 }
 
-// doHttp executes the http request and returns the response
+// doHttp executes the http request and returns the response.
 func (r *cockpitReq) doHttp(ctx context.Context) (*http.Response, error) {
 	if r.apiKey == "" {
 		return nil, errors.New("apiKey is required. either set it as default or pass it as an option")
