@@ -43,10 +43,10 @@ const (
 )
 
 type (
-	// optionFn is a function that applies an option to a cockpitReq
+	// optionFn is a function that applies an option to a cockpitReq.
 	optionFn func(r *cockpitReq) error
 
-	// cockpitReq is a request to the cockpit API
+	// cockpitReq holds the configuration for a request to the cockpit API.
 	cockpitReq struct {
 		httpClient   *http.Client
 		apiKey       string
@@ -58,7 +58,6 @@ type (
 		debug        bool
 		output       interface{}
 		outputHeader *http.Header
-		isImage      bool
 	}
 )
 
@@ -86,7 +85,7 @@ func SetDefaultHttpClient(c *http.Client) {
 func SetDefaultBaseUrl(url string) {
 	mtx.Lock()
 	defer mtx.Unlock()
-	defaultBaseUrl = url
+	defaultBaseUrl = strings.TrimSuffix(url, "/")
 }
 
 // SetDefaultApiKey sets the default api key used for requests.
@@ -158,7 +157,6 @@ func GetImage(ctx context.Context, id string, opts ...optionFn) (string, error) 
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetImage, id)
-	r.isImage = true
 	if err := applyOptions(&r, opts); err != nil {
 		return "", err
 	}
@@ -229,7 +227,7 @@ func WithBaseURL(url string) optionFn {
 			return errors.New("url is required")
 		}
 
-		r.baseURL = url
+		r.baseURL = strings.TrimSuffix(url, "/")
 		return nil
 	}
 }
