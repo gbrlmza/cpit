@@ -10,13 +10,17 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 )
 
 const (
+	// State constants
+	StateArchived  = -1
+	StateDraft     = 0
+	StatePublished = 1
+
 	// ReziseMode constants
 	ResizeModeThumbnail   = "thumbnail"
 	ResizeModeBestFit     = "bestFit"
@@ -40,28 +44,61 @@ const (
 	pathGetItem      = "/content/item/%s/%s"
 	pathDeleteItem   = "/content/item/%s/%s"
 	pathGetItems     = "/content/items/%s"
+
+	assetPath = "%s/storage/uploads/%s"
+	assetLink = "%s/assets/link/%s"
+	apiSuffix = "/api"
 )
 
 type (
-	// optionFn is a function that applies an option to a cockpitReq.
-	optionFn func(r *cockpitReq) error
+	// BaseModel is a struct that contains the common fields for all models
+	BaseModel struct {
+		ID         string `json:"_id,omitempty"`
+		State      int    `json:"_state"`
+		Modified   int    `json:"_modified,omitempty"`
+		ModifiedBy string `json:"_mby,omitempty"`
+		Created    int    `json:"_created,omitempty"`
+		CreatedBy  string `json:"_cby,omitempty"`
+	}
 
-	// cockpitReq holds the configuration for a request to the cockpit API.
-	cockpitReq struct {
-		httpClient   *http.Client
-		apiKey       string
-		baseURL      string
-		method       string
-		path         string
-		params       url.Values
-		body         interface{}
-		debug        bool
-		output       interface{}
-		outputHeader *http.Header
+	// Asset is a struct that holds the fields for an asset
+	Asset struct {
+		BaseModel
+		Hash        string   `json:"_hash,omitempty"`
+		Thumbhash   string   `json:"thumbhash,omitempty"`
+		Path        string   `json:"path,omitempty"`
+		Title       string   `json:"title,omitempty"`
+		Mime        string   `json:"mime,omitempty"`
+		Type        string   `json:"type,omitempty"`
+		Description string   `json:"description,omitempty"`
+		Tags        []any    `json:"tags,omitempty"`
+		Size        int      `json:"size,omitempty"`
+		Colors      []string `json:"colors,omitempty"`
+		Width       int      `json:"width,omitempty"`
+		Height      int      `json:"height,omitempty"`
+		Folder      string   `json:"folder,omitempty"`
+	}
+
+	// Items is a struct that contains the fields for a paginated response
+	Items[T any] struct {
+		Data []T `json:"data"`
+		Meta struct {
+			// Total is the total number of items in the collection and is only
+			// present when the collection is paginated using both the limit and
+			// skip parameters.
+			Total int `json:"total"`
+		} `json:"meta"`
+	}
+
+	// dataWrapper is a wrapper struct for fields in the upsert action
+	dataWrapper struct {
+		Data interface{} `json:"data"`
 	}
 )
 
 var (
+	ErrNotFound = errors.New("not found")
+
 	// defaultHttpClient is the default http client used for requests
 	defaultHttpClient *http.Client
 	// defaultBaseUrl is the default base url used for requests
@@ -72,6 +109,23 @@ var (
 	defaultDebugMode bool
 	// mtx is a mutex to protect the default values
 	mtx = &sync.RWMutex{}
+)
+
+type (
+	// optionFn is a function that applies an option to a cockpitReq.
+	optionFn func(r *cockpitReq) error
+
+	// cockpitReq holds the configuration for a request to cockpit API.
+	cockpitReq struct {
+		httpClient *http.Client
+		apiKey     string
+		baseURL    string
+		method     string
+		path       string
+		params     url.Values
+		body       interface{}
+		debug      bool
+	}
 )
 
 // SetDefaultHttpClient sets the default http client used for requests.
@@ -117,41 +171,94 @@ func newCockpitReq() cockpitReq {
 
 // GetItems requests items of a model.
 // - model is the name of the model
-func GetItems(ctx context.Context, model string, opts ...optionFn) error {
+func GetItems[T any](ctx context.Context, model string, opts ...optionFn) (*Items[T], error) {
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetItems, model)
 	if err := applyOptions(&r, opts); err != nil {
-		return err
+		return nil, err
 	}
-	return r.run(ctx)
+
+	if r.params.Has("skip") && r.params.Has("limit") {
+		// when using pagination, the API response is different and contains a data and meta field
+		output := Items[T]{}
+		if err := r.run(ctx, &output); err != nil {
+			return nil, err
+		}
+		return &output, nil
+	}
+
+	// when not using pagination, the API response is a list of items
+	output := []T{}
+	if err := r.run(ctx, &output); err != nil {
+		return nil, err
+	}
+	return &Items[T]{Data: output}, nil
 }
 
 // GetSingleton requests a singleton model.
 // - model is the name of the model
-func GetSingleton(ctx context.Context, model string, opts ...optionFn) error {
+func GetSingleton[T any](ctx context.Context, model string, opts ...optionFn) (*T, error) {
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetSingleton, model)
 	if err := applyOptions(&r, opts); err != nil {
-		return err
+		return nil, err
 	}
-	return r.run(ctx)
+
+	var output T
+	if err := r.run(ctx, &output); err != nil {
+		return nil, err
+	}
+	return &output, nil
 }
 
 // GetAsset requests an asset.
 // - id is the id of the asset
-func GetAsset(ctx context.Context, id string, opts ...optionFn) error {
+func GetAsset(ctx context.Context, id string, opts ...optionFn) (*Asset, error) {
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetAsset, id)
 	if err := applyOptions(&r, opts); err != nil {
-		return err
+		return nil, err
 	}
-	return r.run(ctx)
+
+	var f Asset
+	if err := r.run(ctx, &f); err != nil {
+		return nil, err
+	}
+	return &f, nil
 }
 
-// GetImage requests an image.
+// GetAssetLink returns a link to the asset. The resulting link will redirect to the asset.
+// If the asset path is known, use GetUploadLink instead.
+func GetAssetLink(id string, opts ...optionFn) (string, error) {
+	r := newCockpitReq()
+	r.method = http.MethodGet
+	r.path = fmt.Sprintf(pathGetAsset, id)
+	if err := applyOptions(&r, opts); err != nil {
+		return "", err
+	}
+
+	baseUrl := strings.TrimSuffix(r.baseURL, apiSuffix)
+	return fmt.Sprintf(assetLink, baseUrl, id), nil
+}
+
+// GetUploadLink returns a direct link to the asset file.
+func GetUploadLink(path string, opts ...optionFn) (string, error) {
+	r := newCockpitReq()
+	r.method = http.MethodGet
+	r.path = fmt.Sprintf(pathGetAsset, path)
+	if err := applyOptions(&r, opts); err != nil {
+		return "", err
+	}
+
+	baseUrl := strings.TrimSuffix(r.baseURL, apiSuffix)
+	path = strings.TrimPrefix(path, "/")
+	return fmt.Sprintf(assetPath, baseUrl, path), nil
+}
+
+// GetImage requests an image. Returns the image url.
 // - id is the id of the image
 func GetImage(ctx context.Context, id string, opts ...optionFn) (string, error) {
 	r := newCockpitReq()
@@ -166,27 +273,38 @@ func GetImage(ctx context.Context, id string, opts ...optionFn) (string, error) 
 // GetItem requests an item.
 // - model is the name of the model
 // - id is the id of the item
-func GetItem(ctx context.Context, model string, id string, opts ...optionFn) error {
+func GetItem[T any](ctx context.Context, model string, id string, opts ...optionFn) (*T, error) {
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetItem, model, id)
 	if err := applyOptions(&r, opts); err != nil {
-		return err
+		return nil, err
 	}
-	return r.run(ctx)
+
+	var output T
+	if err := r.run(ctx, &output); err != nil {
+		return nil, err
+	}
+	return &output, nil
 }
 
 // UpsertItem upserts an item.
 // - model is the name of the model
 // When updating an item, the data/body must contain a valid _id field.
-func UpsertItem(ctx context.Context, model string, opts ...optionFn) error {
+func UpsertItem[T any](ctx context.Context, model string, data interface{}, opts ...optionFn) (*T, error) {
 	r := newCockpitReq()
 	r.method = http.MethodPost
 	r.path = fmt.Sprintf(pathUpsertItem, model)
+	r.body = dataWrapper{Data: data}
 	if err := applyOptions(&r, opts); err != nil {
-		return err
+		return nil, err
 	}
-	return r.run(ctx)
+
+	var output T
+	if err := r.run(ctx, &output); err != nil {
+		return nil, err
+	}
+	return &output, nil
 }
 
 // DeleteItem deletes an item.
@@ -199,7 +317,7 @@ func DeleteItem(ctx context.Context, model string, id string, opts ...optionFn) 
 	if err := applyOptions(&r, opts); err != nil {
 		return err
 	}
-	return r.run(ctx)
+	return r.run(ctx, nil)
 }
 
 // applyOptions applies the options to the request and executes it.
@@ -249,45 +367,6 @@ func WithApiKey(key string) optionFn {
 func WithDebugMode(enabled bool) optionFn {
 	return func(r *cockpitReq) error {
 		r.debug = enabled
-		return nil
-	}
-}
-
-// WithOutputHeader sets where the response headers should be written to.
-func WithOutputHeader(h *http.Header) optionFn {
-	return func(r *cockpitReq) error {
-		r.outputHeader = h
-		return nil
-	}
-}
-
-// WithOutput sets where the output should be written to.
-// The response body will be decoded as json into the output.
-func WithOutput(o interface{}) optionFn {
-	return func(r *cockpitReq) error {
-		if o == nil || reflect.TypeOf(o).Kind() != reflect.Ptr {
-			return errors.New("output must be a pointer")
-		}
-		r.output = o
-		return nil
-	}
-}
-
-// WithBody sets the body for the request.
-// The body can be an io.Reader, []byte, string or any other type that can be encoded as json.
-// The body should have the same structure as the model being upserted wrapped in the Data struct.
-func WithBody(b interface{}) optionFn {
-	return func(r *cockpitReq) error {
-		r.body = b
-		return nil
-	}
-}
-
-// WithData sets the data for the request, works in the same way as WithBody but wraps it in the Data struct.
-// The data will be encoded as json, so it must be a json marshable type.
-func WithData(data interface{}) optionFn {
-	return func(r *cockpitReq) error {
-		r.body = Data{Data: data}
 		return nil
 	}
 }
@@ -440,7 +519,7 @@ func WithPopulate(enabled bool) optionFn {
 }
 
 // run executes the request and parses the response.
-func (r *cockpitReq) run(ctx context.Context) error {
+func (r *cockpitReq) run(ctx context.Context, output interface{}) error {
 	resp, err := r.doHttp(ctx)
 	if err != nil {
 		return err
@@ -448,19 +527,18 @@ func (r *cockpitReq) run(ctx context.Context) error {
 	defer resp.Body.Close()
 	defer io.Copy(io.Discard, resp.Body)
 
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), b)
 	}
 
-	if r.output != nil {
-		if err := json.NewDecoder(resp.Body).Decode(r.output); err != nil {
+	if output != nil {
+		if err := json.NewDecoder(resp.Body).Decode(output); err != nil {
 			return err
 		}
-	}
-
-	if r.outputHeader != nil {
-		*r.outputHeader = resp.Header
 	}
 
 	return nil
@@ -475,12 +553,11 @@ func (r *cockpitReq) runImage(ctx context.Context) (string, error) {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 
+	if resp.StatusCode == http.StatusNotFound {
+		return "", ErrNotFound
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("unexpected status code %d %s: %s", resp.StatusCode, http.StatusText(resp.StatusCode), body)
-	}
-
-	if r.outputHeader != nil {
-		*r.outputHeader = resp.Header
 	}
 
 	return string(body), nil
@@ -499,14 +576,15 @@ func (r *cockpitReq) doHttp(ctx context.Context) (*http.Response, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-
-	body, err := getBodyReader(r.body)
-	if err != nil {
-		return nil, err
+	if httpClient == nil {
+		return nil, errors.New("httpClient is required. either set it as default or pass it as an option")
 	}
 
-	if r.method == http.MethodPost && body == nil {
-		return nil, errors.New("body is required for upserting an item")
+	body := &bytes.Buffer{}
+	if r.body != nil {
+		if err := json.NewEncoder(body).Encode(r.body); err != nil {
+			return nil, fmt.Errorf("failed to encode body: %w", err)
+		}
 	}
 
 	url := fmt.Sprintf("%s%s?%s", r.baseURL, r.path, r.params.Encode())
@@ -514,7 +592,7 @@ func (r *cockpitReq) doHttp(ctx context.Context) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("api-key", r.apiKey)
+	req.Header.Set("Api-Key", r.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpClient.Do(req)
@@ -537,28 +615,4 @@ func (r *cockpitReq) doHttp(ctx context.Context) (*http.Response, error) {
 	}
 
 	return resp, err
-}
-
-// getBodyReader returns an io.Reader for the given body
-func getBodyReader(body interface{}) (io.Reader, error) {
-	var r io.Reader
-
-	switch b := body.(type) {
-	case nil:
-	case io.Reader:
-		r = b
-	case []byte:
-		r = bytes.NewReader(b)
-	case string:
-		r = strings.NewReader(b)
-	default:
-		// try to encode it as json
-		buf := &bytes.Buffer{}
-		if err := json.NewEncoder(buf).Encode(body); err != nil {
-			return nil, fmt.Errorf("failed to encode body: %w", err)
-		}
-		r = buf
-	}
-
-	return r, nil
 }
