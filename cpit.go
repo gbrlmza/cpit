@@ -101,8 +101,8 @@ var (
 
 	// defaultHttpClient is the default http client used for requests
 	defaultHttpClient *http.Client
-	// defaultBaseUrl is the default base url used for requests
-	defaultBaseUrl string
+	// defaultBaseURL is the default base url used for requests
+	defaultBaseURL string
 	// defaultApiKey is the default api key used for requests
 	defaultApiKey string
 	// defaultDebugMode is the default debug mode used for requests
@@ -135,11 +135,11 @@ func SetDefaultHttpClient(c *http.Client) {
 	defaultHttpClient = c
 }
 
-// SetDefaultBaseUrl sets the default base url used for requests.
-func SetDefaultBaseUrl(url string) {
+// SetDefaultBaseURL sets the default base url used for requests.
+func SetDefaultBaseURL(url string) {
 	mtx.Lock()
 	defer mtx.Unlock()
-	defaultBaseUrl = strings.TrimSuffix(url, "/")
+	defaultBaseURL = strings.TrimSuffix(url, "/")
 }
 
 // SetDefaultApiKey sets the default api key used for requests.
@@ -163,7 +163,7 @@ func newCockpitReq() cockpitReq {
 	return cockpitReq{
 		httpClient: defaultHttpClient,
 		apiKey:     defaultApiKey,
-		baseURL:    defaultBaseUrl,
+		baseURL:    defaultBaseURL,
 		params:     make(url.Values),
 		debug:      defaultDebugMode,
 	}
