@@ -1,3 +1,3 @@
 # cpit
-Cockpit CMS Golang Client
 
+[Cockpit CMS](https://getcockpit.com/) Golang Client
