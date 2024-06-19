@@ -171,63 +171,67 @@ func newCockpitReq() cockpitReq {
 
 // GetItems requests items of a model.
 // - model is the name of the model
-func GetItems[T any](ctx context.Context, model string, opts ...optionFn) (*Items[T], error) {
+func GetItems[T any](ctx context.Context, model string, opts ...optionFn) (Items[T], error) {
+	var zero Items[T]
+
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetItems, model)
 	if err := applyOptions(&r, opts); err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	if r.params.Has("skip") && r.params.Has("limit") {
 		// when using pagination, the API response is different and contains a data and meta field
 		output := Items[T]{}
 		if err := r.run(ctx, &output); err != nil {
-			return nil, err
+			return zero, err
 		}
-		return &output, nil
+		return output, nil
 	}
 
 	// when not using pagination, the API response is a list of items
 	output := []T{}
 	if err := r.run(ctx, &output); err != nil {
-		return nil, err
+		return zero, err
 	}
-	return &Items[T]{Data: output}, nil
+	return Items[T]{Data: output}, nil
 }
 
 // GetSingleton requests a singleton model.
 // - model is the name of the model
-func GetSingleton[T any](ctx context.Context, model string, opts ...optionFn) (*T, error) {
+func GetSingleton[T any](ctx context.Context, model string, opts ...optionFn) (T, error) {
+	var zero T
+
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetSingleton, model)
 	if err := applyOptions(&r, opts); err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	var output T
 	if err := r.run(ctx, &output); err != nil {
-		return nil, err
+		return zero, err
 	}
-	return &output, nil
+	return output, nil
 }
 
 // GetAsset requests an asset.
 // - id is the id of the asset
-func GetAsset(ctx context.Context, id string, opts ...optionFn) (*Asset, error) {
+func GetAsset(ctx context.Context, id string, opts ...optionFn) (Asset, error) {
 	r := newCockpitReq()
 	r.method = http.MethodGet
 	r.path = fmt.Sprintf(pathGetAsset, id)
 	if err := applyOptions(&r, opts); err != nil {
-		return nil, err
+		return Asset{}, err
 	}
 
-	var f Asset
-	if err := r.run(ctx, &f); err != nil {
-		return nil, err
+	var a Asset
+	if err := r.run(ctx, &a); err != nil {
+		return Asset{}, err
 	}
-	return &f, nil
+	return a, nil
 }
 
 // GetAssetLink returns a link to the asset. The resulting link will redirect to the asset.
